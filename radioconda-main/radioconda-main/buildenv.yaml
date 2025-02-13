@@ -1,0 +1,14 @@
+name: buildenv
+channels:
+  - conda-forge
+platforms:
+  - linux-64
+  - osx-64
+  - osx-arm64
+  - win-64
+dependencies:
+  - anaconda-client
+  - conda-build
+  - constructor
+  - patch-ng
+  - requests
