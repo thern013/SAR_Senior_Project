@@ -1,20 +1,11 @@
-fs = 32000;  % Sampling frequency
-f = 5;      % Sine wave frequency
-matlabOutputFile = "gnuFileDump/matlabChirp.dat";
+% Parameters for the chirp
+f_start = 0;   % Start frequency in Hz (2.4 GHz)
+f_end = 50;    % End frequency in Hz (2.48 GHz)
+duration = 1e-0;   % Duration in seconds (10 us)
 
-% Generate chirp signal
-outputSignal = generateChirp(fs, f);
-% Call the plot function to display the real, imaginary, and magnitude plots
-plotSignal(rxSignal, fs);
+% Create the chirp signal object
+chirpObj = ChirpSignal(f_start, f_end, duration);
+txSignal = chirpObj.createTxInstance();
+rxSignal = chirpObj.createRxInstance();
+chirpObj.calculateDistance(txSignal, rxSignal)
 
-% % Send the UDP packet
-% sendUDPPacket(iqBytes, fs);
-
-% Write the complex signal to a file (file is cleared first)
-writeSignalToFile(outputSignal, matlabOutputFile);
-
-gnuInputFile = 'gnuFileDump/gnuIQRx.exe';  % Update with your file's location
-rxSignal = readFile(gnuInputFile);
-
-% Call the plot function to display the real, imaginary, and magnitude plots
-plotSignal(rxSignal, fs);
