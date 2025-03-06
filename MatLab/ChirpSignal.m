@@ -20,7 +20,7 @@ classdef ChirpSignal
                 obj.f_end = f_end;
                 obj.fs = 20 * f_end;
                 obj.duration = duration;
-                obj.t = single(0:1/obj.fs:duration);  % Time vector
+                obj.t = single(0:1/obj.fs:obj.duration);  % Time vector
                 obj.signal = obj.generateChirpSignal();  % Generate the chirp signal
             end
         end
@@ -29,7 +29,8 @@ classdef ChirpSignal
         function signal = generateChirpSignal(obj)
             % Generate the complex chirp signal using MATLAB's chirp function
             ph0 = 0;  % Initial phase
-            signal = chirp(obj.t, obj.f_start, obj.t(end), obj.f_end, "linear", ph0, "complex");
+            % signal = chirp(obj.t, obj.f_start, obj.t(end), obj.f_end, "linear", ph0, "complex");
+            signal = chirp(obj.t, obj.f_start, obj.t(end), obj.f_end);
         end
         
         % Method to plot the real and imaginary parts of the chirp signal
@@ -57,7 +58,7 @@ classdef ChirpSignal
                 "TimeResolution", obj.duration / 10, ...  % Adjust time resolution
                 "OverlapPercent", 50, ...  % Adjust overlap
                 "Leakage", 0.85, ...
-                "FrequencyLimits", [obj.f_start * 0.5, obj.f_end * 1.5]);  % Limit frequency range from 2.4 GHz to 2.48 GHz
+                "FrequencyLimits", [obj.f_start, obj.f_end]);  % Limit frequency range from 2.4 GHz to 2.48 GHz
         end
         
         % Method to return the signal
@@ -74,14 +75,14 @@ classdef ChirpSignal
             txSignal = [obj.signal nullSignal];
         end
 
-        function txLoopChirp(obj, loops)
+        function txSignal = txLoopChirp(obj, loops)
             loopingTxSignal = obj.createTxInstance;
 
             for i = 1:loops
                 loopingTxSignal = [loopingTxSignal obj.createTxInstance]; %#ok<AGROW>
             end
 
-            obj.graphRealSignal(loopingTxSignal);            
+            txSignal = loopingTxSignal;           
         end
 
         function randomChirpLength = createRandomizedChirpLength(~)
@@ -116,6 +117,6 @@ classdef ChirpSignal
             xlabel('Time (s)');
             ylabel('Amplitude');
             grid on;
-        end
+        end            
     end
 end

@@ -8,5 +8,4 @@ d = 1e-6;         % Duration of the chirp signal
 chripObj = ChirpSignal(f0, f1, d);
 signal = chripObj.txLoopChirp(1);  % Generate the CW signal (80 MHz)
 b200Obj = B200(f0, f1);            % Initialize the B200 object
-b200Obj = b200Obj.run(signal);     % Transmit and receive the signal
-b200Obj.plot(b200Obj.rxSignal);
+b200Obj = b200Obj.run(signal);               % Transmit and receive the signal
