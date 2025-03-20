@@ -1,4 +1,4 @@
-% Set parameters
+ Set parameters
 f0 = 80e6;        % Frequency of the signal (80 MHz)
 f1 = 80e6;        % Same frequency for a CW signal
 fs = 20 * f1;     % Sample rate (20 times the signal frequency)

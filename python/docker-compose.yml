@@ -1,0 +1,19 @@
+services:
+  usrp:
+    build: .
+    image: usrp
+    container_name: radar
+    environment:
+      - UHD_IMAGES_DIR=/uhd/images
+    volumes:
+      - .:/app
+      - "C:/Program Files/UHD/share/uhd/images:/uhd/images"
+      - /dev:/dev
+    device_cgroup_rules:
+      - "c 189:* rwm"
+    network_mode: host
+    stdin_open: true  # Enable interactive mode
+    tty: true        # Enable TTY for the terminal
+    command: python /app/app.py  # Run your Python app
+
+

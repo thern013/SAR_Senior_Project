@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>Welcome to the App</h1>
+
+    <div id="controls-container"></div>
+
+    <script>
+        // Automatically load controls.html into the page when it is loaded
+        $(document).ready(function() {
+            $.get('/controls', function(data) {
+                $('#controls-container').html(data);
+            });
+        });
+
+        // Use AJAX to handle input change and update the counter
+        $(document).on('keypress', '#counter-input', function(e) {
+            if (e.which === 13) { // Check if "Enter" key was pressed
+                var newCounterValue = $('#counter-input').val();
+                $.ajax({
+                    url: '/set_counter',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({ counter: newCounterValue }),
+                    success: function(data) {
+                        $('#counter-input').val(data.counter); // Update the text box value
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
