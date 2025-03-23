@@ -17,18 +17,18 @@ def usrp_init():
     usrp.set_time_now(uhd.types.TimeSpec(0.0))
     channel = 0
 
-    usrp.set_rx_gain(0, channel)
+    usrp.set_rx_gain(76, channel)
     usrp.set_rx_freq(100e6, channel)
     usrp.set_rx_bandwidth(5e6, channel)
 
-    usrp.set_tx_gain(89, channel)
+    usrp.set_tx_gain(89.75, channel)
     usrp.set_tx_freq(100e6, channel)
     usrp.set_tx_bandwidth(5e6, channel)
 
     delay = 2.0
     time_spec = usrp.get_time_now().get_real_secs() + delay
 
-    max_samples = 2040*30
+    sample_rate = 2040*30
 
     print(f"""RX SETTINGS 
         antenna:    {usrp.get_rx_antenna(channel)}
@@ -52,12 +52,12 @@ def usrp_init():
         lo enabled: {usrp.get_tx_lo_export_enabled('PGA', channel)}
     """)
     
-    return usrp, time_spec, max_samples
+    return usrp, time_spec, sample_rate, delay
 
 def get_rx_stream(usrp):
     # Create stream arguments
     rx_stream_args = uhd.usrp.StreamArgs("fc32", "sc16")
-    rx_stream_args.args = "spp=2040"  # Setting for samples per packet
+    # rx_stream_args.args = "spp=2040"  # Setting for samples per packet
     rx_stream_args.channels = [0]
 
     # create RX Streamer
@@ -68,34 +68,33 @@ def get_rx_stream(usrp):
 def get_tx_stream(usrp):
     # Create stream arguments
     tx_stream_args = uhd.usrp.StreamArgs("fc32", "sc16")
-    tx_stream_args.args = "spp=200" 
+    # tx_stream_args.args = "spp=2040" 
 
     # create tx stream
     tx_streamer = usrp.get_tx_stream(tx_stream_args) 
 
     return tx_streamer
 
-def recv_stream(rx_streamer, time_spec, quit_event, rx_data, max_samples):
+def recv_stream(rx_streamer, time_spec, quit_event, rx_data, sample_rate):
     # Create Metadata
     rx_metadata = uhd.types.RXMetadata() 
 
     # Create Stream Command for continuous mode
     stream_cmd = uhd.types.StreamCMD(uhd.types.StreamMode.start_cont)
-    stream_cmd.time_spec = uhd.types.TimeSpec(time_spec)  # Set delayed start time
+    stream_cmd.time_spec = uhd.types.TimeSpec(time_spec - 0.05)  # Set delayed start time
     stream_cmd.stream_now = False  # Do not stream immediately
 
 
    # Create a buffer to hold received samples
-    recv_buffer = np.zeros(rx_streamer.get_max_num_samps(), dtype=np.complex64)
+    recv_buffer = np.zeros(sample_rate, dtype=np.complex64)
 
     # Issue the stream command, but do not start immediately
     rx_streamer.issue_stream_cmd(stream_cmd)
 
+    print(f"Receiving at: {usrp.get_time_now().get_real_secs()}")
+
     # Receive samples after the delay
-    while usrp.get_time_now().get_real_secs() < time_spec:
-        pass 
-    print(f"begin recv stream: {usrp.get_time_now().get_real_secs()}")
-    while len(rx_data[0]) < max_samples:  
+    while not quit_event.is_set():
         samps = rx_streamer.recv(recv_buffer, rx_metadata)
 
         # no error receieved fill buffer
@@ -106,16 +105,20 @@ def recv_stream(rx_streamer, time_spec, quit_event, rx_data, max_samples):
         # timeout error due to internal clock being less than the stream_cmd.time_spec
         elif rx_metadata.error_code == uhd.types.RXMetadataErrorCode.timeout:
             pass
+        if rx_metadata.error_code == uhd.types.RXMetadataErrorCode.overflow:
+            print(f"time: {usrp.get_time_now().get_real_secs()} buffer overflow - cur size: {len(rx_data[0])} - last packet size: {samps}")
+        if rx_metadata.error_code == uhd.types.RXMetadataErrorCode.late:
+            print(f"time: {usrp.get_time_now().get_real_secs()} stream late ")
 
     # Stop the continuous stream
     rx_streamer.issue_stream_cmd(uhd.types.StreamCMD(uhd.types.StreamMode.stop_cont))
-    quit_event.set()
-    print(f"end recv stream: {usrp.get_time_now().get_real_secs()} size: {len(rx_data[0])}")
+
     return rx_data
 
-def trans_stream(tx_streamer, time_spec, tx_data, max_samples):
+def trans_stream(tx_streamer, time_spec, quit_event, tx_data, sample_rate):
     # set buffer
-    tx_buffer = get_pulse(max_samples)
+    tx_buffer = get_pulse(sample_rate)
+
     # set streamer and metadata
     tx_metadata = uhd.types.TXMetadata()
 
@@ -123,30 +126,58 @@ def trans_stream(tx_streamer, time_spec, tx_data, max_samples):
     tx_metadata.time_spec = uhd.types.TimeSpec(time_spec)  # convert to uhd format (get internal time in seconds)
     tx_metadata.has_time_spec = True
 
+    print(f"Transmitting at: {usrp.get_time_now().get_real_secs()}")
+
     # send stream until thread is stopped
-    # while usrp.get_time_now().get_real_secs() < time_spec:
-    #     pass
-    while not quit_event.is_set():
-        samps = tx_streamer.send(tx_buffer, tx_metadata)
-        print(f"sent packet at: {usrp.get_time_now().get_real_secs()}  size: {samps}")
-        tx_data[0].extend(tx_buffer)
-        tx_data[1].append(tx_metadata)
+    # while not quit_event.is_set():
+    tx_streamer.send(tx_buffer, tx_metadata)
+
+    tx_data[0].extend(tx_buffer)
+    tx_data[1].append(tx_metadata)
 
     return tx_data
 
 
-def get_pulse(max_samples):
-    max_samps = max_samples
+def get_pulse(sample_rate):
+    max_samps = sample_rate
     
     # Create pulse1 and pulse2
-    pulse1 = np.zeros(max_samps // 2, dtype=np.complex64)
-    pulse2 = np.zeros(max_samps // 2, dtype=np.complex64)
+    pulse1 = np.ones(max_samps // 2, dtype=np.complex64) * 5
+    pulse2 = np.ones(max_samps // 2, dtype=np.complex64) * -5
     
     # Concatenate the pulses
     pulse = np.concatenate((pulse1, pulse2))
 
     return pulse
 
+def get_correlation(rx_data, tx_data, sample_rate):
+# Check if there is any data to plot
+    if not rx_data[0] or not tx_data[0]:
+        print("No data to calculate.")
+        return
+
+    rx_data_real = np.real(rx_data[0])
+    rx_data_imag = np.imag(rx_data[0])
+
+    tx_data_real = np.real(tx_data[0])
+    tx_data_imag = np.imag(tx_data[0])
+
+    # Compute cross-correlation between transmitted and received signals (real part)
+    corr_real = correlate(tx_data_real, rx_data_real, mode='full')
+    corr_imag = correlate(tx_data_imag, rx_data_imag, mode='full')
+
+    # Find the lag at which the cross-correlation is maximum
+    lag_real = np.argmax(np.abs(corr_real)) - len(tx_data_real) + 1
+    lag_imag = np.argmax(np.abs(corr_imag)) - len(tx_data_imag) + 1
+
+    time_lag_real = lag_real / sample_rate
+    time_lag_imag = lag_imag / sample_rate
+
+    print(f"Maximum correlation for real part: Lag = {lag_real} samples, Time Lag = {time_lag_real} seconds")
+    print(f"Maximum correlation for imaginary part: Lag = {lag_imag} samples, Time Lag = {time_lag_imag} seconds")
+
+
+    return corr_real, corr_imag
 
 def plot_tx_rx_data(rx_data, tx_data):
     """
@@ -158,23 +189,11 @@ def plot_tx_rx_data(rx_data, tx_data):
         print("No data to plot.")
         return
 
-    # Flatten the list of buffers into one large array for plotting
-    rx_data_real = ([np.real(d) for d in rx_data[0]])
-    rx_data_imag = ([np.imag(d) for d in rx_data[0]])
+    rx_data_real = np.real(rx_data[0])
+    rx_data_imag = np.imag(rx_data[0])
 
-    tx_data_real = ([np.real(d) for d in tx_data[0]])
-    tx_data_imag = ([np.imag(d) for d in tx_data[0]])
-
-    # Compute cross-correlation between transmitted and received signals (real part)
-    corr_real = correlate(tx_data_real, rx_data_real, mode='full')
-    corr_imag = correlate(tx_data_imag, rx_data_imag, mode='full')
-
-    # Find the lag at which the cross-correlation is maximum
-    lag_real = np.argmax(np.abs(corr_real)) - len(tx_data_real) + 1
-    lag_imag = np.argmax(np.abs(corr_imag)) - len(tx_data_imag) + 1
-
-    print(f"Maximum correlation for real part: Lag = {lag_real} samples")
-    print(f"Maximum correlation for imaginary part: Lag = {lag_imag} samples")
+    tx_data_real = np.real(tx_data[0])
+    tx_data_imag = np.imag(tx_data[0])    
 
     # Plot the received and transmitted signals
     plt.figure(figsize=(12, 6))
@@ -197,6 +216,7 @@ def plot_tx_rx_data(rx_data, tx_data):
     plt.tight_layout()
     plt.show()
 
+def plot_correlation(corr_real, corr_imag):
     # Plot cross-correlation
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 1, 1)
@@ -217,22 +237,6 @@ def plot_tx_rx_data(rx_data, tx_data):
     plt.show()
 
 
-def calculate_snr(tx_data, rx_data):
-    # Flatten tx and rx data
-    tx_data_flat = np.concatenate([np.real(d) for d in tx_data[0]])
-    rx_data_flat = np.concatenate([np.real(d) for d in rx_data[0]])
-
-    # Signal power (transmitted signal)
-    signal_power = np.mean(np.abs(tx_data_flat)**2)
-
-    # Noise power (difference between received and transmitted signal)
-    noise_power = np.mean(np.abs(rx_data_flat - tx_data_flat)**2)
-
-    # Compute SNR
-    snr = 10 * np.log10(signal_power / noise_power)
-    print(f"SNR: {snr} dB")
-    return snr
-
 if __name__ == "__main__":
     rx_data = [[], []]
     tx_data = [[], []]
@@ -241,27 +245,33 @@ if __name__ == "__main__":
     quit_event = threading.Event()
     duration = 1
     
-    usrp, time_spec, max_samples = usrp_init()
+    usrp, time_spec, sample_rate, delay = usrp_init()
 
     rx_thread = threading.Thread(target=recv_stream, 
-                                 args = (get_rx_stream(usrp), time_spec, quit_event, rx_data, max_samples),
+                                 args = (get_rx_stream(usrp), time_spec, quit_event, rx_data, sample_rate),
                                  name="recv_stream",)
+    threads.append(rx_thread)
+    rx_thread.start()
+
     tx_thread = threading.Thread(target=trans_stream,
-                                 args=(get_tx_stream(usrp), time_spec, tx_data, max_samples),
+                                 args=(get_tx_stream(usrp), time_spec, quit_event, tx_data, sample_rate),
                                  name="trans_stream",)
 
-    threads.append(rx_thread)
     threads.append(tx_thread)
-    for thr in threads:
-        thr.start()
-
-    print("threading start")
+    tx_thread.start()
+    print("threads started")
     
-
-    while not quit_event.is_set():
-        for thr in threads:
-            thr.join()
-
+    while(usrp.get_time_now().get_real_secs() < delay + 0.1):
+        pass
+    quit_event.set()
+    for thr in threads:
+        thr.join()
     print("threading join")
+
+    print(f"Rx data size: {len(rx_data[0])} Tx data size: {len(tx_data[0])}")
+
+    corr_real, corr_imag = get_correlation(rx_data, tx_data, sample_rate)
+    
     plot_tx_rx_data(rx_data, tx_data)
+    plot_correlation(corr_real, corr_imag)
 
