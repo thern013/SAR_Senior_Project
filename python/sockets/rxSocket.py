@@ -1,40 +1,30 @@
-import asyncio
-import websockets
-import numpy as np
+from flask import Flask
+from flask_socketio import SocketIO, emit
 
-# Shared variable
-complex_number = np.complex64(0 + 0j)  # Initial value
-clients = set()  # Track connected clients
+# Create Flask app and SocketIO instance
+app = Flask(__name__)
+socketio = SocketIO(app)
 
-async def send_updates():
-    """Continuously check for changes and notify clients."""
-    global complex_number
-    last_value = complex_number  # Store last sent value
+# Global variable to store the rxData
+rx_data_buffer = []
 
-    while True:
-        await asyncio.sleep(0.1)  # Small delay to avoid high CPU usage
+@app.route('/')
+def index():
+    return "SocketIO Server Running"
 
-        if complex_number != last_value:
-            last_value = complex_number
-            message = complex_number.tobytes()
-            if clients:  # Only send if clients are connected
-                await asyncio.gather(*(client.send(message) for client in clients))
-                print(f"Sent updated value: {complex_number}")
+# Event that sends rxData[0] to Angular client
+@socketio.on('connect')
+def handle_connect():
+    print("Client connected")
+    if rx_data_buffer:
+        emit('rx_data', {'data': rx_data_buffer[0]})
 
-async def handle_client(websocket, path):
-    """Handle incoming client connections."""
-    global clients
-    clients.add(websocket)
-    try:
-        await websocket.wait_closed()  # Keep connection open
-    finally:
-        clients.remove(websocket)  # Remove on disconnect
+# Function to update the rx_data_buffer with new data from the Radio class
+def set_complex_number(rx_data):
+    global rx_data_buffer
+    rx_data_buffer = [rx_data]
+    # You can trigger the sending of data here as well
+    socketio.emit('rx_data', {'data': rx_data[0]})
 
-async def main():
-    server = await websockets.serve(handle_client, "localhost", 8765)
-    print("WebSocket server running on ws://localhost:8765")
-
-    # Run the update task alongside the server
-    await asyncio.gather(server.wait_closed(), send_updates())
-
-asyncio.run(main())
+if __name__ == '__main__':
+    socketio.run(app, debug=True)

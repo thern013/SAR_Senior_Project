@@ -1,4 +1,6 @@
 import matplotlib.pyplot as plt
+import numpy as np
+
 
 def plot_tx_rx_data(rx_data, tx_data, sample_rate):
     """
@@ -15,10 +17,9 @@ def plot_tx_rx_data(rx_data, tx_data, sample_rate):
 
     tx_data_real = np.real(tx_data[0])
     tx_data_imag = np.imag(tx_data[0])    
-    tx_data_real = np.append(tx_data_real, np.zeros(sample_rate))
     tx_data_real = tx_data_real
 
-    t = np.linspace(0, len(rx_data[0]), sample_rate*2)
+    t = np.linspace(0, len(rx_data[0]), sample_rate)
 
     # Plot the received and transmitted signals
     plt.figure(figsize=(12, 6))
