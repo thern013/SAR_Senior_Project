@@ -8,6 +8,8 @@ class Radio:
     def __init__(self):
         self.usrp_init()
         self.set_rx_stream()
+        self.set_rx_metadata()
+        self.set_rx_stream_cmd()
         self.set_tx_stream()
 
     def usrp_init(self):
@@ -63,6 +65,14 @@ class Radio:
         # create RX Streamer
         self.rx_streamer = self.usrp.get_rx_stream(self.rx_stream_args)
 
+    def set_rx_metadata(self): 
+        self.rx_metadata = uhd.types.RXMetadata() 
+
+    def set_rx_stream_cmd(self):
+        # Create Stream Command for continuous mode
+        self.rx_stream_cmd = uhd.types.StreamCMD(uhd.types.StreamMode.start_cont)
+        self.rx_stream_cmd.time_spec = uhd.types.TimeSpec(self.time_spec)  # Set delayed start time
+        self.rx_stream_cmd.stream_now = False  # Do not stream immediately
 
     def set_tx_stream(self):
         # Create stream arguments
@@ -73,72 +83,69 @@ class Radio:
         self.tx_streamer = self.usrp.get_tx_stream(self.tx_stream_args) 
 
     def get_usrp(self): return self.usrp
-    def get_rx_stream(self): return self.rx_streamer
-    def get_tx_stream(self): return self.tx_streamer
+    def get_rx_streamer(self): return self.rx_streamer
+    def get_tx_streamer(self): return self.tx_streamer
+    def get_rx_metadata(self): return self.rx_metadata
+    def get_rx_stream_cmd(self): return self.rx_stream_cmd
     def get_sample_rate(self): return self.sample_rate
     def get_time_spec(self): return self.time_spec
     def get_delay(self): return self.delay
 
-
-def recv_stream(usrp, rx_streamer, time_spec, quit_event, rx_data, sample_rate):
-    # Create Metadata
-    rx_metadata = uhd.types.RXMetadata() 
-
-    # Create Stream Command for continuous mode
-    stream_cmd = uhd.types.StreamCMD(uhd.types.StreamMode.start_cont)
-    stream_cmd.time_spec = uhd.types.TimeSpec(time_spec)  # Set delayed start time
-    stream_cmd.stream_now = False  # Do not stream immediately
+    def set_new_time_spec(self): self.time_spec = self.time_spec + self.delay
 
 
+def recv_stream(radio, quit_event, rx_data):
    # Create a buffer to hold received samples
-    recv_buffer = np.zeros(sample_rate, dtype=np.complex64)
+    recv_buffer = np.zeros(radio.get_sample_rate(), dtype=np.complex64)
 
     # Issue the stream command, but do not start immediately
-    rx_streamer.issue_stream_cmd(stream_cmd)
+    radio.get_rx_streamer().issue_stream_cmd(radio.get_rx_stream_cmd())
 
-    print(f"Receiving at: {usrp.get_time_now().get_real_secs()}")
+    print(f"Receiving at: {radio.get_usrp().get_time_now().get_real_secs()}")
 
     # Receive samples after the delay
     while not quit_event.is_set():
-        samps = rx_streamer.recv(recv_buffer, rx_metadata)
+        samps = radio.get_rx_streamer().recv(recv_buffer, radio.get_rx_metadata())
 
         # no error receieved fill buffer
-        if rx_metadata.error_code == uhd.types.RXMetadataErrorCode.none:
+        if radio.get_rx_metadata().error_code == uhd.types.RXMetadataErrorCode.none:
             rx_data[0].extend(recv_buffer)
-            rx_data[1].append(rx_metadata)
+            rx_data[1].append(radio.get_rx_metadata())
 
         # timeout error due to internal clock being less than the stream_cmd.time_spec
-        elif rx_metadata.error_code == uhd.types.RXMetadataErrorCode.timeout:
+        elif radio.get_rx_metadata().error_code == uhd.types.RXMetadataErrorCode.timeout:
             pass
-        if rx_metadata.error_code == uhd.types.RXMetadataErrorCode.overflow:
-            print(f"time: {usrp.get_time_now().get_real_secs()} buffer overflow - cur size: {len(rx_data[0])} - last packet size: {samps}")
-        if rx_metadata.error_code == uhd.types.RXMetadataErrorCode.late:
-            print(f"time: {usrp.get_time_now().get_real_secs()} stream late ")
+        if radio.get_rx_metadata().error_code == uhd.types.RXMetadataErrorCode.overflow:
+            print(f"time: {radio.get_usrp().get_time_now().get_real_secs()} buffer overflow - cur size: {len(rx_data[0])} - last packet size: {samps}")
+        if radio.get_rx_metadata().error_code == uhd.types.RXMetadataErrorCode.late:
+            print(f"time: {radio.get_usrp().get_time_now().get_real_secs()} stream late ")
 
     # Stop the continuous stream
-    rx_streamer.issue_stream_cmd(uhd.types.StreamCMD(uhd.types.StreamMode.stop_cont))
+    radio.get_rx_streamer().issue_stream_cmd(uhd.types.StreamCMD(uhd.types.StreamMode.stop_cont))
 
     return rx_data
 
-def trans_stream(usrp, tx_streamer, time_spec, quit_event, tx_data, sample_rate):
+def trans_stream(radio, quit_event, tx_data):
     # set buffer
-    tx_buffer = get_pulse(sample_rate)
+    tx_buffer = get_pulse(radio.get_sample_rate())
 
     # set streamer and metadata
     tx_metadata = uhd.types.TXMetadata()
 
     # set meatadata args 
-    tx_metadata.time_spec = uhd.types.TimeSpec(time_spec)  # convert to uhd format (get internal time in seconds)
+    tx_metadata.time_spec = uhd.types.TimeSpec(radio.get_time_spec())  # convert to uhd format (get internal time in seconds)
     tx_metadata.has_time_spec = True
 
-    print(f"Transmitting at: {usrp.get_time_now().get_real_secs()}")
+    print(f"Transmitting at: {radio.get_usrp().get_time_now().get_real_secs()}")
 
     # send stream until thread is stopped
     # while not quit_event.is_set():
-    tx_streamer.send(tx_buffer, tx_metadata)
+    radio.get_tx_streamer().send(tx_buffer, tx_metadata)
 
     tx_data[0].extend(tx_buffer)
     tx_data[1].append(tx_metadata)
+
+
     return tx_data
 
 
@@ -191,16 +198,16 @@ if __name__ == "__main__":
 
     threads = []
     quit_event = threading.Event()
-    duration = 1
+    
     
     rx_thread = threading.Thread(target=recv_stream, 
-                                 args = (radio.get_usrp(), radio.get_rx_stream(), radio.get_time_spec(), quit_event, rx_data, radio.get_sample_rate()),
+                                 args = (radio, quit_event, rx_data),
                                  name="recv_stream",)
     threads.append(rx_thread)
     rx_thread.start()
 
     tx_thread = threading.Thread(target=trans_stream,
-                                 args=(radio.get_usrp(), radio.get_tx_stream(), radio.get_time_spec(), quit_event, tx_data, radio.get_sample_rate()),
+                                 args=(radio, quit_event, tx_data),
                                  name="trans_stream",)
 
     threads.append(tx_thread)
@@ -209,6 +216,7 @@ if __name__ == "__main__":
     
     while(radio.get_usrp().get_time_now().get_real_secs() < radio.get_delay() + 0.1):
         pass
+        
     quit_event.set()
     for thr in threads:
         thr.join()
