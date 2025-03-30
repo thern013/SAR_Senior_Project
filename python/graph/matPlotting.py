@@ -19,12 +19,13 @@ def plot_tx_rx_data(rx_data, tx_data, sample_rate):
     tx_data_imag = np.imag(tx_data[0])    
     tx_data_real = tx_data_real
 
-    t = np.linspace(0, len(rx_data[0]), sample_rate)
+    t_rx = np.linspace(0, len(rx_data[0]), int(len(rx_data[0])))
+    t_tx = np.linspace(0, len(tx_data[0]), int(len(tx_data[0])))
 
     # Plot the received and transmitted signals
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 1, 1)
-    plt.plot(t, rx_data_real, label=f"recv Real", color='b')
+    plt.plot(t_rx, rx_data_real, label=f"recv Real", color='b')
     # plt.plot(rx_data_imag, label=f"recv Imag", color='r')
     plt.title(f"Received Data")
     plt.xlabel("Sample Index")
@@ -32,7 +33,7 @@ def plot_tx_rx_data(rx_data, tx_data, sample_rate):
     plt.legend()
 
     plt.subplot(2, 1, 2)
-    plt.plot(t, tx_data_real, label=f"trans Real", color='b')
+    plt.plot(t_tx, tx_data_real, label=f"trans Real", color='b')
     # plt.plot(tx_data_imag, label=f"trans Imag", color='r')
     plt.title(f"Transmitted Data")
     plt.xlabel("Sample Index")
