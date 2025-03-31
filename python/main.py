@@ -19,17 +19,16 @@ app.add_middleware(
 # Instantiate the Radio class
 my_radio = Radio()
 
-while True:
-    rx_amplitude = my_radio.imaging()
 # Function to send data to a specific WebSocket connection
 async def send_radio_response(websocket: WebSocket, path: str):
     try:
         while True:
             rx_amplitude = my_radio.imaging()
             rx_bytes = rx_amplitude.astype(np.uint8).tobytes()
+            print(f'Rx_avg_pwr: {rx_amplitude}')
             await websocket.send_bytes(rx_bytes)
 
-            await asyncio.sleep(3)  # Non-blocking sleep
+            await asyncio.sleep(0.5)  # Non-blocking sleep
     except WebSocketDisconnect:
         print(f"Client disconnected from {path}")
     except Exception as e:

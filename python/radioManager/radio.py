@@ -22,7 +22,8 @@ class Radio:
         self.bandwith = 5e6
         self.sample_rate = int(2000)
         self.cpu_format = "fc32"
-        self.otw_format = "sc8"
+        self.otw_format = "sc16"
+        self.tx_gain = 60 # max 89.75 
 
         # Initialize the USRP device
         self.usrp = uhd.usrp.MultiUSRP()
@@ -36,7 +37,7 @@ class Radio:
         self.usrp.set_rx_freq(self.freq, self.channel)
         self.usrp.set_rx_bandwidth(self.bandwith, self.channel)
 
-        self.usrp.set_tx_gain(89.75, self.channel)
+        self.usrp.set_tx_gain(self.tx_gain, self.channel)
         self.usrp.set_tx_freq(self.freq, self.channel)
         self.usrp.set_tx_bandwidth(self.bandwith, self.channel)
 
@@ -97,12 +98,14 @@ class Radio:
         self.tx_streamer = self.usrp.get_tx_stream(self.tx_stream_args) 
 
     def set_tx_metadata(self):
-        # set streamer and metadata
         self.tx_metadata = uhd.types.TXMetadata()
-
-        # set meatadata args 
-        self.tx_metadata.time_spec = uhd.types.TimeSpec(self.get_time_spec())  # convert to uhd format (get internal time in seconds)
+        self.set_tx_time_spec()
         self.tx_metadata.has_time_spec = True
+        self.tx_metadata.start_of_burst = True  # Indicate start of burst
+        self.tx_metadata.end_of_burst = True    # Ensure TX stops at the end of burst
+
+    def set_tx_time_spec(self):
+        self.tx_metadata.time_spec = uhd.types.TimeSpec(self.get_time_spec())  
 
     def get_usrp(self): return self.usrp
     def get_rx_streamer(self): return self.rx_streamer
@@ -119,15 +122,18 @@ class Radio:
         self.time_spec = self.get_time() + self.delay
         self.set_rx_stream_cmd_time_spec()
         self.rx_metadata.reset()
-        self.set_tx_metadata()
+        self.set_tx_time_spec()
 
-    def recv_stream(self, recv_event, tx_event):
+
+    def recv_stream(self, recv_event, tx_event, main_event):
         # Create a buffer to hold received samples
         recv_buffer = np.zeros(self.sample_rate, dtype=np.complex64)
+
 
         # Issue the stream command, but do not start immediately
         self.rx_streamer.issue_stream_cmd(self.rx_stream_cmd)
         # Receive samples after the delay
+
         while not tx_event.is_set():
             samps = self.rx_streamer.recv(recv_buffer, self.rx_metadata)
 
@@ -135,7 +141,7 @@ class Radio:
             if self.rx_metadata.error_code == uhd.types.RXMetadataErrorCode.none:
                 self.rx_data[0].extend(recv_buffer)
                 self.rx_data[1].append(self.rx_metadata)
-                self.rx_streamer.issue_stream_cmd(uhd.types.StreamCMD(uhd.types.StreamMode.stop_cont))
+
             # timeout error due to internal clock being less than the stream_cmd.time_spec
             elif self.rx_metadata.error_code == uhd.types.RXMetadataErrorCode.timeout:
                 print(f"Delay till: {self.time_spec} time: {self.usrp.get_time_now().get_real_secs()}")
@@ -144,10 +150,12 @@ class Radio:
             if self.rx_metadata.error_code == uhd.types.RXMetadataErrorCode.late:
                 print(f"time: {self.usrp.get_time_now().get_real_secs()} stream late ")
 
+        self.rx_streamer.issue_stream_cmd(uhd.types.StreamCMD(uhd.types.StreamMode.stop_cont))
+
         # Stop the continuous stream
         recv_event.set()
         
-    def trans_stream(self, tx_event):
+    def trans_stream(self, tx_event, main_event):
         # set buffer
         tx_buffer = self.pulse
 
@@ -173,6 +181,7 @@ class Radio:
 
         # Combine into a complex signal
         pulse = I + 1j * Q
+
         return pulse
 
     def getAmplitude(self):
@@ -180,8 +189,8 @@ class Radio:
             print("No data to calculate.")
             return
 
-        rx_avg_pwr = np.mean(np.abs(self.rx_data[0][:1000])**2) * 255
-        tx_avg_pwr = np.mean(np.abs(self.tx_data[0][:1000])**2) * 255
+        rx_avg_pwr = np.mean(np.abs(self.rx_data[0][-self.sample_rate:])**2) * (255 / 2)
+        tx_avg_pwr = np.mean(np.abs(self.tx_data[0])**2) * 255
 
         return rx_avg_pwr, tx_avg_pwr
     
@@ -234,42 +243,51 @@ class Radio:
         threads = []
         recv_event = threading.Event()
         tx_event = threading.Event()
+        main_event = threading.Event()
         
         recv_event.clear()
         tx_event.clear()
+        main_event.clear()
 
-        self.set_new_time_spec()
 
         rx_thread = threading.Thread(target=self.recv_stream, 
-                                    args = (recv_event, tx_event),
+                                    args = (recv_event, tx_event, main_event),
                                     name="recv_stream",)
         threads.append(rx_thread)
 
         tx_thread = threading.Thread(target=self.trans_stream,
-                                    args=(tx_event,),
+                                    args=(tx_event, main_event),
                                     name="trans_stream",)
     
         threads.append(tx_thread)
 
+        self.set_new_time_spec()    # set new time_spec  
+
         for thr in threads:
             thr.start()
-        recv_event.wait()
+        
+        # allow thread start up 
+        recv_event.wait()   # wait for recv thread
 
         for thr in threads:
             thr.join()
+
+        # print(f"""Rx data size: {len(self.rx_data[0])} Tx data size: {len(self.tx_data[0])}
+        #     Tx/Rx dealy : {self.time_spec}
+        #     Rx data time: {self.rx_data[1][0].time_spec.get_full_secs() + self.rx_data[1][0].time_spec.get_frac_secs()}
+        #     Tx data time: {self.tx_data[1][0].time_spec.get_full_secs() + self.tx_data[1][0].time_spec.get_frac_secs()}
+        #     Rx precision: {self.rx_data[0][0]}
+        #     Tx Precision: {self.tx_data[0][0]}
+        # \n""")
+        
+        if len(self.rx_data[0]) <= self.sample_rate:
+            print(f'sample was too small')
+            self.imaging()
+
         rx_avg_pwr, tx_avg_pwr =  self.getAmplitude()
 
-        print(f"""Rx data size: {len(self.rx_data[0])} Tx data size: {len(self.tx_data[0])}
-            Rx data time: {self.rx_data[1][0].time_spec.get_full_secs() + self.rx_data[1][0].time_spec.get_frac_secs()}
-            Tx data time: {self.tx_data[1][0].time_spec.get_full_secs() + self.tx_data[1][0].time_spec.get_frac_secs()}
-            Rx precision: {self.rx_data[0][0]}
-            Tx Precision: {self.tx_data[0][0]}
-            Rx Power: {rx_avg_pwr.astype(np.float16)}
-            Tx Power: {tx_avg_pwr.astype(np.float16)}
-        \n""")
-
         # corr_real, corr_imag = get_correlation(self.rx_data, self.tx_data, radio.get_sample_rate())
-        matPlotting.plot_tx_rx_data(self.rx_data, self.tx_data, self.sample_rate)
+        # matPlotting.plot_tx_rx_data(self.rx_data, self.tx_data, self.sample_rate)
         # plot_correlation(corr_real, corr_imag)        
         # print(f'rx_avg_prw: {rx_avg_pwr}')
         return rx_avg_pwr

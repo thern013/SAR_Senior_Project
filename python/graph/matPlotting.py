@@ -26,7 +26,7 @@ def plot_tx_rx_data(rx_data, tx_data, sample_rate):
     plt.figure(figsize=(12, 6))
     plt.subplot(2, 1, 1)
     plt.plot(t_rx, rx_data_real, label=f"recv Real", color='b')
-    # plt.plot(rx_data_imag, label=f"recv Imag", color='r')
+    plt.plot(rx_data_imag, label=f"recv Imag", color='r')
     plt.title(f"Received Data")
     plt.xlabel("Sample Index")
     plt.ylabel("Amplitude")
@@ -34,7 +34,7 @@ def plot_tx_rx_data(rx_data, tx_data, sample_rate):
 
     plt.subplot(2, 1, 2)
     plt.plot(t_tx, tx_data_real, label=f"trans Real", color='b')
-    # plt.plot(tx_data_imag, label=f"trans Imag", color='r')
+    plt.plot(tx_data_imag, label=f"trans Imag", color='r')
     plt.title(f"Transmitted Data")
     plt.xlabel("Sample Index")
     plt.ylabel("Amplitude")
