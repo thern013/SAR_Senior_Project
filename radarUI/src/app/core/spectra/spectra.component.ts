@@ -1,9 +1,4 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
-import { WaterfallComponent } from "./core/waterfall/waterfall.component";
-import { ControlsComponent } from "./core/controls/controls.component";
-import {MatGridListModule} from '@angular/material/grid-list';
-import { SpectraComponent } from "./core/spectra/spectra.component";
+import { Component } from '@angular/core';
 import {
   SciChartSurface, 
   NumericAxis,
@@ -25,26 +20,19 @@ async function initSciChart() {
   // How-to steps at https://www.scichart.com/licensing-scichart-js/
   // SciChartSurface.setRuntimeLicenseKey("YOUR_RUNTIME_KEY");
 
-  // Inside your SciChart initialization code
-  SciChartSurface.loadWasmLocal();
-
   // Initialize SciChartSurface. Don't forget to await!
-  console.log('here we go')
   const { sciChartSurface, wasmContext } = await SciChartSurface.create("scichart-root", {
     theme: new SciChartJsNavyTheme(),
     title: "SciChart.js First Chart",
     titleStyle: { fontSize: 22 }
   });
-  console.log('await to initialize scichartsurface')
 
   // Create an XAxis and YAxis with growBy padding
-  console.log('await to initialize create XY axis')
   const growBy = new NumberRange(0.1, 0.1);
   sciChartSurface.xAxes.add(new NumericAxis(wasmContext, { axisTitle: "X Axis", growBy }));
   sciChartSurface.yAxes.add(new NumericAxis(wasmContext, { axisTitle: "Y Axis", growBy }));
 
   // Create a line series with some initial data
-  console.log('create a line series')
   sciChartSurface.renderableSeries.add(new FastLineRenderableSeries(wasmContext, {
     stroke: "steelblue",
     strokeThickness: 3,
@@ -57,28 +45,26 @@ async function initSciChart() {
   }));
 
   // Add some interaction modifiers to show zooming and panning
-  console.log('Interaction modifier set')
   sciChartSurface.chartModifiers.add(new MouseWheelZoomModifier(), new ZoomPanModifier(), new ZoomExtentsModifier());
 
-  console.log('done')  
   return sciChartSurface;
 }
 
 @Component({
-  selector: 'app-root',
+  selector: 'app-spectra',
   standalone: true,
-  imports: [RouterOutlet, WaterfallComponent, ControlsComponent, MatGridListModule, SpectraComponent],
-  templateUrl: './app.component.html',
-  styleUrl: './app.component.scss'
+  imports: [],
+  templateUrl: './spectra.component.html',
+  styleUrl: './spectra.component.scss'
 })
-export class AppComponent implements OnInit, OnDestroy {
+export class SpectraComponent {
   title = "angular-scichart-demo";
   chartInitializationPromise?: Promise<SciChartSurface>;
 
   ngOnInit(): void {
     console.log("Angular: ngOnInit");
     this.cleanupSciChart();
-    this.chartInitializationPromise = initSciChart();
+    this.chartInitializationPromise = initSciChart(); // defined above
   }
 
   ngOnDestroy() {

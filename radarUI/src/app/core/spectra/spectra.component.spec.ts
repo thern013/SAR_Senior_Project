@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { RadarManagerComponent } from './radar-manager.component';
+import { SpectraComponent } from './spectra.component';
 
-describe('RadarManagerComponent', () => {
-  let component: RadarManagerComponent;
-  let fixture: ComponentFixture<RadarManagerComponent>;
+describe('SpectraComponent', () => {
+  let component: SpectraComponent;
+  let fixture: ComponentFixture<SpectraComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [RadarManagerComponent]
+      imports: [SpectraComponent]
     })
     .compileComponents();
 
-    fixture = TestBed.createComponent(RadarManagerComponent);
+    fixture = TestBed.createComponent(SpectraComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });

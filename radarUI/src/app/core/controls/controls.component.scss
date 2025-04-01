@@ -1,0 +1,19 @@
+.card {
+    background-color: grey;
+}
+
+.form-list { 
+    display: flex;
+    flex-direction: column;
+    width: 200px;
+    height: fit-content;
+}
+
+.form {
+    max-width: auto;
+}
+
+.save-btn {
+    background-color: green;
+    color: black !important;
+}

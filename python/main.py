@@ -3,6 +3,7 @@ import time
 import numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from radioManager.radio import Radio  # Import your class
 
 app = FastAPI()
@@ -28,7 +29,7 @@ async def send_radio_response(websocket: WebSocket, path: str):
             print(f'Rx_avg_pwr: {rx_amplitude}')
             await websocket.send_bytes(rx_bytes)
 
-            await asyncio.sleep(0.5)  # Non-blocking sleep
+            await asyncio.sleep(2)  # Non-blocking sleep
     except WebSocketDisconnect:
         print(f"Client disconnected from {path}")
     except Exception as e:
@@ -47,7 +48,40 @@ async def websocket_endpoint_2(websocket: WebSocket):
     await send_radio_response(websocket, "/ws2")
 
 # HTTP endpoint for fetching radio status
-@app.get("/sampleRate")
-async def get_radio_status():
-    response = my_radio.get_sample_rate()
-    return {"sample_rate": response}
+@app.get("/radarConfig")
+async def get_radar_config():
+    carrier_frequency, bandwidth, sample_rate, rx_gain, tx_gain = my_radio.get_config()
+    jsonBody = {'carrier_frequency': carrier_frequency,
+                'bandwidth': bandwidth,
+                'sample_rate': sample_rate,
+                'rx_gain': rx_gain,
+                'tx_gain': tx_gain}
+    
+    return jsonBody
+
+class RadarConfig(BaseModel):
+    carrier_frequency: float
+    bandwidth: float
+    sample_rate: int
+    rx_gain: int
+    tx_gain: int
+    
+# HTTP endpoint for fetching radio status
+@app.patch("/radarConfig")
+async def set_radar_config(config: RadarConfig):
+    my_radio.set_config(
+    config.carrier_frequency, 
+    config.bandwidth, 
+    config.sample_rate, 
+    config.rx_gain, 
+    config.tx_gain
+    )
+
+    carrier_frequency, bandwidth, sample_rate, rx_gain, tx_gain = my_radio.get_config()
+    jsonBody = {'carrier_frequency': carrier_frequency,
+                'bandwidth': bandwidth,
+                'sample_rate': sample_rate,
+                'rx_gain': rx_gain,
+                'tx_gain': tx_gain}
+    
+    return jsonBody

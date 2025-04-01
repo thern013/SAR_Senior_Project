@@ -1,6 +1,19 @@
 .radar-ui {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     height: 100%;
-    overflow: auto;
+    width: 50%;
+}
+
+app-waterfall {
+    flex-grow: 1;  /* Takes up remaining space in the flex container */
+    height: 100%;
+    width: 100%;
+}
+
+
+app-controls {
+    height: 100%;
+    width: 250px;
+    position: relative;
 }

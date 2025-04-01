@@ -1,8 +1,47 @@
-<div>
-    <textarea>Center Freq</textarea>
-    <textarea>Rx Gain</textarea>
-    <textarea>Tx Gain</textarea>
-    <textarea>Rx/Tx freq</textarea>
-    <textarea>Rx/Tx Bandwidth</textarea>
-    <textarea>pulse delay</textarea>
-</div>
+<mat-card class="card" appearance="raised">
+    <mat-card-content>
+        <form class="form-list">
+            <mat-form-field class="form">
+                <mat-label>Carrier Frequency (GHz)</mat-label>
+                <input matNativeControl  [(ngModel)]="config.carrier_frequency" [ngModelOptions]="{standalone: true}">
+            </mat-form-field>
+            <mat-slider min=".1" max="6.0" step="0.1" showTickMarks discrete>
+                <input matSliderThumb [(value)]="config.carrier_frequency">
+            </mat-slider>
+    
+            <mat-form-field class="form">
+                <mat-label>Bandwidth (MHz)</mat-label>
+                <input matNativeControl  [(ngModel)]="config.bandwidth" [ngModelOptions]="{standalone: true}">
+            </mat-form-field>
+            <mat-slider min="1" max="55" step="1" showTickMarks discrete>
+                <input matSliderThumb [(value)]="config.bandwidth">
+            </mat-slider>
+    
+            <mat-form-field class="form">
+                <mat-label>Sample Rate</mat-label>
+                <input matNativeControl  [(ngModel)]="config.sample_rate" [ngModelOptions]="{standalone: true}">
+            </mat-form-field>
+            <mat-slider min="100" max="10000" step="100" showTickMarks discrete>
+                <input matSliderThumb [(value)]="config.sample_rate">
+            </mat-slider>
+    
+            <mat-form-field class="form">
+                <mat-label>Rx Gain (db)</mat-label>
+                <input matNativeControl  [(ngModel)]="config.rx_gain" [ngModelOptions]="{standalone: true}">
+            </mat-form-field>
+            <mat-slider min="0" max="76" step="1" showTickMarks discrete>
+                <input matSliderThumb [(value)]="config.rx_gain">
+            </mat-slider>
+    
+            <mat-form-field class="form">
+                <mat-label>Tx Gain (db)</mat-label>
+                <input matNativeControl  [(ngModel)]="config.tx_gain" [ngModelOptions]="{standalone: true}">
+            </mat-form-field>
+            <mat-slider min="0" max="89" step="1" showTickMarks discrete>
+                <input matSliderThumb [(value)]="config.tx_gain">
+            </mat-slider>
+    
+            <button mat-stroked-button class="save-btn" (click)="saveSettings()">Set Config</button>
+          </form>
+    </mat-card-content>
+</mat-card>

@@ -1,19 +1,18 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, PLATFORM_ID, Inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, PLATFORM_ID, Inject, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import * as THREE from 'three';
-import { RadarFeedService } from '../../shared/services/radar-feed.service';
 import { WebsocketService } from '../../shared/services/websocket.service';
-import { off } from 'process';
-import { time } from 'console';
+import { MatCardModule } from '@angular/material/card';
 
 @Component({
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MatCardModule],
   selector: 'app-waterfall',
   templateUrl: './waterfall.component.html',
   styleUrls: ['./waterfall.component.scss']
 })
 export class WaterfallComponent implements OnInit, AfterViewInit {
+  @ViewChild('canvas', { static: true }) canvasRef!: ElementRef<HTMLCanvasElement>;
   frequency_samples = 128; // Y resolution
   DATA = new Uint8Array(this.frequency_samples);
   camera: any 
@@ -33,7 +32,6 @@ export class WaterfallComponent implements OnInit, AfterViewInit {
   ysegmentSize = this.ysize / this.ysegments;
 
   constructor(@Inject(PLATFORM_ID) private platformId: Object,
-              private radarFeedService: RadarFeedService,
               private webSocketService: WebsocketService) {}
 
   ngOnInit() {
@@ -42,6 +40,7 @@ export class WaterfallComponent implements OnInit, AfterViewInit {
   }
 
   ngAfterViewInit(): void {
+
     if (isPlatformBrowser(this.platformId)) {
       this.initThreeJs();
     }
@@ -57,7 +56,7 @@ export class WaterfallComponent implements OnInit, AfterViewInit {
 
   private initThreeJs(): void {
     // Place the camera in space
-    this.camera = new THREE.PerspectiveCamera(27, window.innerWidth / window.innerHeight, 1, 1000);
+    this.camera = new THREE.PerspectiveCamera(27, this.canvasRef.nativeElement.clientWidth / this.canvasRef.nativeElement.clientHeight, 1, 1000);
     this.camera.position.z = 64;
     this.scene = new THREE.Scene();
     let geometry = new THREE.BufferGeometry();
@@ -124,9 +123,10 @@ export class WaterfallComponent implements OnInit, AfterViewInit {
     });
 
     // Initialize the renderer and connect it to the DIV
+    let canvas = this.canvasRef.nativeElement;
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     let container = document.getElementById('Spectrogram');
     container?.appendChild(this.renderer.domElement);
 
