@@ -1,7 +1,24 @@
-<!--The content below is only a placeholder and can be replaced.-->
-<div style="text-align:center">
-    <h1>
-      Welcome to {{ title }}!
-    </h1>
+<div [ngStyle]="{ background: appTheme.Background }" class="chart-wrapper">
+  <div class="chart-container">
+      <scichart-angular
+          [initChart]="chartsInitializationAPI.initAudioChart"
+          (onInit)="onChartInit($event, 'audio')"
+          style="flex: 1;"
+      >
+      </scichart-angular>
+      <div class="fft-spectrogram-container">
+          <scichart-angular
+              [initChart]="chartsInitializationAPI.initFftChart"
+              (onInit)="onChartInit($event, 'fft')"
+              style="flex: 1;"
+          >
+          </scichart-angular>
+          <scichart-angular
+              [initChart]="chartsInitializationAPI.initSpectogramChart"
+              (onInit)="onChartInit($event, 'spectrogram')"
+              style="flex: 1;"
+          >
+          </scichart-angular>
+      </div>
+  </div>
 </div>
-<div id="scichart-root"></div>

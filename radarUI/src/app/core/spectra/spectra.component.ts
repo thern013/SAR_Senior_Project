@@ -1,85 +1,51 @@
-import { Component } from '@angular/core';
-import {
-  SciChartSurface, 
-  NumericAxis,
-  FastLineRenderableSeries,
-  XyDataSeries,
-  EllipsePointMarker,
-  SweepAnimation,
-  SciChartJsNavyTheme,
-  NumberRange,
-  MouseWheelZoomModifier,
-  ZoomPanModifier,
-  ZoomExtentsModifier
-} from "scichart";
+import { Component } from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { ScichartAngularComponent } from "scichart-angular";
+import { getChartsInitializationApi } from "./assets/drawExample";
+import { appTheme } from "./assets/theme";
 
-async function initSciChart() {
-  // LICENSING
-  // Commercial licenses set your license code here
-  // Purchased license keys can be viewed at https://www.scichart.com/profile
-  // How-to steps at https://www.scichart.com/licensing-scichart-js/
-  // SciChartSurface.setRuntimeLicenseKey("YOUR_RUNTIME_KEY");
-
-  // Initialize SciChartSurface. Don't forget to await!
-  const { sciChartSurface, wasmContext } = await SciChartSurface.create("scichart-root", {
-    theme: new SciChartJsNavyTheme(),
-    title: "SciChart.js First Chart",
-    titleStyle: { fontSize: 22 }
-  });
-
-  // Create an XAxis and YAxis with growBy padding
-  const growBy = new NumberRange(0.1, 0.1);
-  sciChartSurface.xAxes.add(new NumericAxis(wasmContext, { axisTitle: "X Axis", growBy }));
-  sciChartSurface.yAxes.add(new NumericAxis(wasmContext, { axisTitle: "Y Axis", growBy }));
-
-  // Create a line series with some initial data
-  sciChartSurface.renderableSeries.add(new FastLineRenderableSeries(wasmContext, {
-    stroke: "steelblue",
-    strokeThickness: 3,
-    dataSeries: new XyDataSeries(wasmContext, {
-      xValues: [0,1,2,3,4,5,6,7,8,9],
-      yValues: [0, 0.0998, 0.1986, 0.2955, 0.3894, 0.4794, 0.5646, 0.6442, 0.7173, 0.7833]
-    }),
-    pointMarker: new EllipsePointMarker(wasmContext, { width: 11, height: 11, fill: "#fff" }),
-    animation: new SweepAnimation({ duration: 300, fadeEffect: true })
-  }));
-
-  // Add some interaction modifiers to show zooming and panning
-  sciChartSurface.chartModifiers.add(new MouseWheelZoomModifier(), new ZoomPanModifier(), new ZoomExtentsModifier());
-
-  return sciChartSurface;
-}
 
 @Component({
   selector: 'app-spectra',
   standalone: true,
-  imports: [],
+  imports: [CommonModule, ScichartAngularComponent],
   templateUrl: './spectra.component.html',
   styleUrl: './spectra.component.scss'
 })
 export class SpectraComponent {
-  title = "angular-scichart-demo";
-  chartInitializationPromise?: Promise<SciChartSurface>;
+  chartsInitializationAPI = getChartsInitializationApi();
+  audioChart: any;
+  fftChart: any;
+  spectrogramChart: any;
+  controlsRef: any;
+  appTheme = appTheme;
 
-  ngOnInit(): void {
-    console.log("Angular: ngOnInit");
-    this.cleanupSciChart();
-    this.chartInitializationPromise = initSciChart(); // defined above
+  async onChartInit(event: any, chartType: "audio" | "fft" | "spectrogram") {
+      if (event?.sciChartSurface) {
+          switch (chartType) {
+              case "audio":
+                  this.audioChart = event.sciChartSurface;
+                  break;
+              case "fft":
+                  this.fftChart = event.sciChartSurface;
+                  break;
+              case "spectrogram":
+                  this.spectrogramChart = event.sciChartSurface;
+                  break;
+          }
+
+          if (this.audioChart && this.fftChart && this.spectrogramChart) {
+              this.configureCharts();
+          }
+      } else {
+          console.log("Chart not initialized!");
+      }
   }
 
-  ngOnDestroy() {
-    console.log("Angular: ngOnDestroy");
-    this.cleanupSciChart();
-  }
-
-  cleanupSciChart() {
-    if (this.chartInitializationPromise) {
-      // Delete the chart from the DOM, and dispose of SciChart
-      this.chartInitializationPromise.then((sciChartSurface) => {
-        console.log("... Deleting SciChartSurface");
-        sciChartSurface.delete();
-      });
-      this.chartInitializationPromise = undefined;
-    }
+  private configureCharts() {
+      if (this.audioChart && this.fftChart && this.spectrogramChart) {
+          this.controlsRef = this.chartsInitializationAPI.onAllChartsInit();
+          this.controlsRef.startUpdate();
+      }
   }
 }

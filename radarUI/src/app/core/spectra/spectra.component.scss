@@ -1,0 +1,15 @@
+.chart-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+.chart-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.fft-spectrogram-container {
+    display: flex;
+    flex: 1;
+}
