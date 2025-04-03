@@ -20,7 +20,7 @@ class Radio:
         self.tx_data = [[],[]]
         self.freq = 2.4e9
         self.bandwith = 5e6
-        self.sample_rate = int(2000)
+        self.sample_rate = int(2048)
         self.cpu_format = "fc32"
         self.otw_format = "sc16"
         self.rx_gain = 76 # max 76
@@ -155,7 +155,7 @@ class Radio:
 
     def get_pulse(self):        
         f = 10  # Frequency in Hz
-        duration = 1e-0  # Duration in seconds
+        duration = 10/f  # Duration in seconds
 
         # Generate time array
         t = np.linspace(0, duration, int(self.sample_rate * duration), endpoint=False)
@@ -265,7 +265,7 @@ class Radio:
         rx_avg_pwr, tx_avg_pwr =  self.getAmplitude()
 
         # corr_real, corr_imag = get_correlation(self.rx_data, self.tx_data, radio.get_sample_rate())
-        return rx_avg_pwr
+        return rx_avg_pwr, np.real(self.rx_data[0][-2048:])
 
     def print_radio_specs(self):
         print(f"""RX SETTINGS 

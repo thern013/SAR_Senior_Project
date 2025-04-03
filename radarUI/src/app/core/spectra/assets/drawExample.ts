@@ -1,3 +1,4 @@
+import { WebsocketService } from "../../../shared/services/websocket.service";
 import { AudioDataProvider } from "./AudioDataProvider";
 import { Radix2FFT } from "./Radix2FFT";
 import { appTheme } from "./theme";
@@ -27,9 +28,10 @@ import {
 
 const AUDIO_STREAM_BUFFER_SIZE = 2048;
 
-export const getChartsInitializationApi = () => {
-    const dataProvider = new AudioDataProvider();
-
+export const getChartsInitializationApi = (_websocket: WebsocketService) => {
+    SciChartSurface.UseCommunityLicense();
+    const dataProvider = new AudioDataProvider(2048, 2048);
+    const webSocketData = _websocket
     const bufferSize = dataProvider.bufferSize;
     const sampleRate = dataProvider.sampleRate;
 
@@ -39,6 +41,7 @@ export const getChartsInitializationApi = () => {
     const fftSize = fft.fftSize;
     const fftCount = 200;
 
+    let socketData: Int16Array = new Int16Array(0);
     let fftXValues: number[];
     let spectrogramValues: number[][];
 
@@ -48,6 +51,7 @@ export const getChartsInitializationApi = () => {
     let spectrogramDS: UniformHeatmapDataSeries;
 
     let hasAudio: boolean;
+    let newData: boolean = false;
 
     const helpText = new TextAnnotation({
         x1: 0,
@@ -61,6 +65,13 @@ export const getChartsInitializationApi = () => {
         textColor: "#FFFFFF88",
     });
 
+    webSocketData.getRecvDataMessages().subscribe(
+        data => {
+            socketData = data;
+            newData = true;
+        }
+    );
+
     function updateAnalysers(frame: number): void {
         // Make sure Audio is initialized
         if (dataProvider.initialized === false) {
@@ -68,25 +79,32 @@ export const getChartsInitializationApi = () => {
         }
 
         // Get audio data
-        const audioData = dataProvider.next();
+        const audioData = dataProvider.next(socketData);
 
         // Update Audio Chart. When fifoCapacity is set, data automatically scrolls
         audioDS.appendRange(audioData!.xData, audioData!.yData);
-
         // Update History. When fifoCapacity is set, data automatically scrolls
         historyDS.appendRange(audioData!.xData, audioData!.yData);
 
         // Perform FFT
         const fftData = fft.run(audioData!.yData);
 
-        // Update FFT Chart. Clear() and appendRange() is a fast replace for data (if same size)
-        fftDS.clear();
-        fftDS.appendRange(fftXValues, fftData);
+        if(newData) {                
+            // Update FFT Chart. Clear() and appendRange() is a fast replace for data (if same size)
+            fftDS.clear();
+            fftDS.appendRange(fftXValues, fftData);
+        }
+        
 
         // Update Spectrogram Chart
         spectrogramValues.shift();
         spectrogramValues.push(fftData);
         spectrogramDS.setZValues(spectrogramValues);
+
+        if (socketData.length !== 0) { 
+            socketData = new Int16Array(0)
+            newData = false;
+        }
     }
 
     // AUDIO CHART
@@ -99,7 +117,7 @@ export const getChartsInitializationApi = () => {
         // Create an XAxis for the live audio
         const xAxis = new NumericAxis(wasmContext, {
             id: "audio",
-            autoRange: EAutoRange.Always,
+            autoRange: EAutoRange.Once,
             drawLabels: false,
             drawMinorTickLines: false,
             drawMajorTickLines: false,
@@ -112,6 +130,7 @@ export const getChartsInitializationApi = () => {
         // Create an XAxis for the history of the audio on the same chart
         const xhistAxis = new NumericAxis(wasmContext, {
             id: "history",
+            visibleRangeSizeLimit: new NumberRange(0, 2048*4),
             autoRange: EAutoRange.Always,
             drawLabels: false,
             drawMinorGridLines: false,

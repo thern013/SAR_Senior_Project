@@ -1,5 +1,6 @@
 import { UntypedFormBuilder } from "@angular/forms";
 import { AudioData } from "./AudioData";
+import { error } from "console";
 
 export class AudioDataProvider {
     private sampleRateProperty: number;
@@ -22,7 +23,7 @@ export class AudioDataProvider {
 
     public permissionError?: boolean | undefined;
 
-    constructor(sampleRate: number = 44100, bufferSizeProperty: number = 2048) {
+    constructor(sampleRate: number, bufferSizeProperty: number) {
         this.sampleRateProperty = sampleRate;
         this.bufferSizeProperty = bufferSizeProperty;
         this.audioData = new AudioData(bufferSizeProperty);
@@ -97,20 +98,31 @@ export class AudioDataProvider {
         this.isDeletedProperty = true;
     }
 
-    public next() {
+    public next(socketData: Int16Array) {
         if (this.initialized === false) {
-            throw new Error("Audio isn't initialized!");
+            throw new Error("Data provider isn't initialized!");
+        }
+        let customData
+
+        if (socketData.length !== 0) {
+            customData = Array.from(socketData);
+        }
+        else {
+            customData = Array.from( {length: this.bufferSizeProperty }, () => 0);
         }
 
+        // Generate a random array of values between -32768 and 32767
+        // customData = Array.from({ length: this.bufferSizeProperty }, () => 
+        //     Math.floor(Math.random() * 65536) - 32768
+        // );
         this.analyserNode!.getByteTimeDomainData(this.freqByteData!);
 
-        for (let i = 0; i < this.bufferSizeProperty; i++) {
+        for (let i = 0; i < customData.length; i++) {
             this.audioData!.xData[i] = this.time++;
-            // Convert 8-bit unsigned integer to 16-bit signed integer,
-            // so that values are in range expected for Radix2FFT
-            this.audioData!.yData[i] = (this.freqByteData![i] / 255) * 65535 - 32768;
+            this.audioData!.yData[i] = customData![i];
         }
-
+    
         return this.audioData;
     }
+    
 }

@@ -36,7 +36,7 @@ export class WaterfallComponent implements OnInit, AfterViewInit {
 
   ngOnInit() {
     // this.radarFeedService.initializeService()
-    this.webSocketService.connect()
+    this.webSocketService.connectAmplitude()
   }
 
   ngAfterViewInit(): void {
@@ -45,7 +45,7 @@ export class WaterfallComponent implements OnInit, AfterViewInit {
       this.initThreeJs();
     }
 
-    this.webSocketService.getMessages().subscribe(amplitude => {
+    this.webSocketService.getAmplitudeMessages().subscribe(amplitude => {
       this.update_radar_feed(amplitude[0])
     });
 

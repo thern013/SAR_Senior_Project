@@ -1,8 +1,21 @@
+.radar-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    background-color: black;
+}
+
 .radar-ui {
     display: flex;
     flex-direction: row;
     height: 100%;
-    width: 50%;
+    width: 75%;
+}
+
+.analyzer {
+    width: 100%;
+    height: 100%;
 }
 
 app-waterfall {
@@ -10,7 +23,6 @@ app-waterfall {
     height: 100%;
     width: 100%;
 }
-
 
 app-controls {
     height: 100%;
