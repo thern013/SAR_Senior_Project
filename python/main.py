@@ -1,10 +1,12 @@
 import asyncio
 import json
+import time
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 from pydantic import BaseModel
 from radioManager.radio import Radio  # Import your class
+import serial
 
 app = FastAPI()
 
@@ -17,7 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Instantiate the Radio class
+ser = serial.Serial('COM3', 9600)
+command = "MOVE"
 my_radio = Radio()
 
 # Store WebSocket connections
@@ -28,9 +31,26 @@ async def handle_data():
     """Continuously fetch and send data to connected WebSocket clients."""
     while True:
         try:
+            # Send the command to Arduino
+            data_to_send = f"command: {command}"
+            ser.write(data_to_send.encode())
+
+            start_time = time.time()
+            while ser.in_waiting == 0:
+                # Check if timeout (5 seconds) has passed
+                if time.time() - start_time > 5:
+                    print("No data received within timeout period.")
+                    break
+
+            # Read and print the response from Arduino if available
+            if ser.in_waiting > 0:
+                data = ser.readline()  # Read a line of data
+                print(data.decode('utf-8').strip())  # Decode byte data to string and remove newlines
+
+
             # Get both number and array from the imaging function
             amplitude, recv_data = my_radio.imaging()
-
+                
             # Convert data to bytes
             rx_bytes = amplitude.astype(np.uint8).tobytes()
             recv_bytes = (recv_data * 32767).astype(np.int16).tobytes()
@@ -71,7 +91,7 @@ async def handle_data():
             print(f"Unexpected error in handle_data loop: {e}")
 
         # Sleep before sending the next set of data
-        await asyncio.sleep(2)  # Adjust as needed
+        await asyncio.sleep(0.5)  # Adjust as needed
 
 @app.websocket("/amplitude/ws")
 async def websocket_amplitude(websocket: WebSocket):
